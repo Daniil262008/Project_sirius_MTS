@@ -1,0 +1,161 @@
+pip install openpyxl xlsxwriter
+
+import requests
+from bs4 import BeautifulSoup
+import re
+import json
+import pandas as pd
+import xlsxwriter as xl
+
+import requests
+from bs4 import BeautifulSoup
+
+#rew_list = []
+#mai_list = []
+data_list=[]
+
+# URL с отзывом
+url1 = "https://tophotels.ru/review/"
+url_number = '10000'
+
+# Заголовок User-Agent для запроса
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.183 Safari/537.36"
+}
+
+
+
+for i in range(3):
+
+    url = url1 + str(url_number)
+    url_number = int(url_number) + 1
+
+    response = requests.get(url, headers=headers)
+    print(url)
+
+
+    if response.status_code == 200:
+
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+
+        review_section = soup.find("section", class_="bth__txt rev-txt")
+        if review_section:
+            review = review_section.find("div", class_="js-review-text")
+            review_text = " ".join([p.get_text(strip=True) for p in review.find_all("p")]) if review else "Отзыв не найден"
+        else:
+            review_text = "Секция с отзывом не найдена"
+
+
+
+        rating_section = soup.find("section", class_="rating")
+
+        if rating_section:
+            main_rating = (
+                rating_section.find("div", class_="rating__bb bg-green") or
+                rating_section.find("div", class_="rating__bb bg-orange") or
+                rating_section.find("div", class_="rating__bb bg-red") or
+                rating_section.find("div", class_="rating__bb")
+            )
+            main_rating = main_rating.get_text(strip=True) if main_rating else "Рейтинг не найден"
+        else:
+            main_rating = "Рейтинг не найден"
+
+
+
+    #rew_list.append(review_text)
+    #mai_list.append(main_rating)
+    data_list.append({
+        'rating': main_rating,
+        'text':review_text
+    })
+
+
+# Создаем DataFrame из списка
+df = pd.DataFrame(data_list)
+
+# Выводим DataFrame
+df
+
+#print(rew_list)
+#print(mai_list)
+
+
+
+df.to_excel('result.xlsx', index=False)
+
+import re
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+
+# Загрузка стоп-слов и инициализация лемматизатора
+nltk.download('stopwords')
+nltk.download('punkt')
+nltk.download('wordnet')
+stop_words = set(stopwords.words('russian'))
+lemmatizer = WordNetLemmatizer()
+
+# Функция для предобработки текста
+def preprocess_text(text):
+    # Приведение текста к нижнему регистру
+    text = text.lower()
+
+    # Удаление ссылок и спецсимволов
+    text = re.sub(r"http\S+|www\S+|https\S+", '', text, flags=re.MULTILINE)
+    text = re.sub(r'\@\w+|\#','', text)
+
+    # Удаление чисел и пунктуации
+    text = re.sub(r'\d+', '', text)
+    text = re.sub(r'[^\w\s]', '', text)
+
+    # Токенизация текста
+    words = word_tokenize(text)
+
+    # Удаление стоп-слов и лемматизация
+    words = [lemmatizer.lemmatize(word) for word in words if word not in stop_words]
+
+    return " ".join(words)
+
+# Пример использования
+df['cleaned_review'] = df['text'].apply(preprocess_text)
+df['cleaned_review']
+
+
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+from wordcloud import WordCloud
+
+# Анализ длины отзывов
+df['review_length'] = df['cleaned_review'].apply(lambda x: len(x.split()))
+plt.figure(figsize=(10,6))
+sns.histplot(df['review_length'], bins=50, kde=True)
+plt.title('Распределение длины отзывов')
+plt.show()
+
+# Облако слов для визуализации частотности слов
+wordcloud = WordCloud(width=800, height=400, background_color ='white').generate(' '.join(df['cleaned_review']))
+plt.figure(figsize=(10,6))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis('off')
+plt.show()
+
+# Анализ распределения рейтингов
+plt.figure(figsize=(6,4))
+sns.countplot(x='rating', data=df)
+plt.title('Распределение рейтингов')
+plt.show()
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+# Инициализация TF-IDF векторайзера
+tfidf = TfidfVectorizer(max_features=5000)
+
+# Преобразование обучающих данных
+X = tfidf.fit_transform(df['cleaned_review'])
+
+# Визуализация первых 10 признаков
+print(tfidf.get_feature_names_out()[:50])
