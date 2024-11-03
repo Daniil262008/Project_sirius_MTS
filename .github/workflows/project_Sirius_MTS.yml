@@ -1,4 +1,4 @@
-pip install openpyxl xlsxwriter #Установить перед ипользованием, а также создать файл result в Excel
+pip install openpyxl xlsxwriter #Установить перед ипользованием, а также создать файл result формата .xlsx
 
 import requests
 from bs4 import BeautifulSoup
